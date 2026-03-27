@@ -31,9 +31,8 @@ jobs:
           channelId: live
 
       - name: Deploy Firebase Functions
-        uses: w9jds/firebase-action@master
-        with:
-          args: deploy --only functions
-        env:
-          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-          GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > sa.json
+          export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/sa.json
+          npx firebase-tools deploy --only functions --project stockinvestigate-36eb4 -f
+          rm sa.json
