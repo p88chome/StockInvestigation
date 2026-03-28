@@ -40,6 +40,9 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/sa.json
 
+          # Enable legacy config command (required for functions:config:set)
+          npx firebase-tools experiments:enable legacyRuntimeConfigCommands
+
           # Set Azure OpenAI config as Firebase Function environment variables
           npx firebase-tools functions:config:set \
             azure.endpoint="${AZURE_OPENAI_ENDPOINT}" \
