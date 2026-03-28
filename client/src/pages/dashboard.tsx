@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "wouter";
 import type { DashboardData } from "@shared/schema";
 import { PerplexityAttribution } from "@/components/PerplexityAttribution";
+import { useToast } from "@/hooks/use-toast";
 
 // Extracted Components
 import { StockCard } from "@/components/dashboard/StockCard";
@@ -28,6 +29,7 @@ import { NewsItem } from "@/components/dashboard/NewsItem";
 import { XPostCard } from "@/components/dashboard/XPostCard";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MarketHeader, SentimentDistribution } from "@/components/dashboard/MarketHeader";
+import { Calendar, Info } from "lucide-react";
 
 /* ─── Motion presets ─── */
 const spring = { type: "spring" as const, damping: 30, stiffness: 200 };
@@ -47,6 +49,7 @@ function LoadingSkeleton() {
 }
 
 export default function Dashboard() {
+  const { toast } = useToast();
   const [isDark, setIsDark] = useState(typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   const [activeTab, setActiveTab] = useState<"news" | "x">("x");
   const [marketTab, setMarketTab] = useState<"tw" | "us" | "crypto">("tw");
@@ -60,7 +63,17 @@ export default function Dashboard() {
 
   const analyzeMutation = useMutation({
     mutationFn: async () => { const res = await apiRequest("POST", "/api/analyze"); return res.json(); },
-    onSuccess: () => { setTimeout(() => { queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }); }, 2000); },
+    onSuccess: (data) => {
+      if (data?.status === "started") {
+        toast({ title: "分析已啟動", description: "AI 正在背景分析最新市場數據，這可能需要約 30 秒至 1 分鐘，請稍候。" });
+      } else if (data?.status === "already_running") {
+        toast({ title: "分析執行中", description: "AI 已經在背景進行分析，請稍候。" });
+      }
+      setTimeout(() => { queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }); }, 2000);
+    },
+    onError: () => {
+      toast({ title: "啟動失敗", description: "無法啟動分析，請稍後再試。", variant: "destructive" });
+    }
   });
 
   const filteredStocks = data?.stocks.filter((s) => s.market === marketTab) || [];
@@ -161,6 +174,30 @@ export default function Dashboard() {
           </Card>
         </motion.div>
 
+        {data?.upcomingEvents && data.upcomingEvents.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.1 }} className="mb-5 overflow-x-auto pb-2 scrollbar-hide">
+            <div className="flex items-center gap-2 mb-2 px-1">
+              <Calendar className="w-3.5 h-3.5 text-primary" />
+              <h2 className="text-xs font-bold">即將法說會 (Event Calendar)</h2>
+            </div>
+            <div className="flex gap-3">
+              {data.upcomingEvents.map((event, i) => (
+                <div key={i} className="flex-shrink-0 w-48 p-2.5 rounded-xl bg-card border border-border/60 hover:border-primary/30 transition-colors shadow-sm relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+                  </div>
+                  <div className="flex justify-between items-start mb-1.5">
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">{event.ticker}</span>
+                    <span className="text-[10px] text-muted-foreground font-medium">{event.date}</span>
+                  </div>
+                  <p className="text-[11px] font-semibold mb-1 truncate">{event.stockName}</p>
+                  <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{event.description}</p>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
         <motion.div className="grid grid-cols-3 gap-3 mb-5" variants={stagger} initial="hidden" animate="show">
           <KpiCard value={bullishCount} label="看漲" color="text-emerald-500" icon={TrendingUp} testId="kpi-bullish" />
           <KpiCard value={neutralCount} label="中性" color="text-gray-400" icon={Minus} testId="kpi-neutral" />
@@ -175,8 +212,8 @@ export default function Dashboard() {
                 <motion.div className="absolute inset-0 rounded-full bg-primary/20" animate={{ scale: [1, 2, 1], opacity: [0.4, 0, 0.4] }} transition={{ duration: 2, repeat: Infinity }} />
               </div>
               <p className="text-sm text-muted-foreground mb-3">AI 正在分析最新市場新聞與 X 輿情，請稍候...</p>
-              <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} data-testid="button-start-analysis">
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5" />啟動分析
+              <Button disabled={analyzeMutation.isPending} variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} data-testid="button-start-analysis">
+                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzeMutation.isPending ? "animate-spin" : ""}`} />啟動分析
               </Button>
             </Card>
           </motion.div>

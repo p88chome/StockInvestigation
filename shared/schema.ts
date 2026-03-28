@@ -49,7 +49,24 @@ export interface StockQuote {
   open: number;
 }
 
-// Types for the API response
+// ─── Market Events & Institutional Data ───
+
+export interface LegalConference {
+  ticker: string;
+  stockName: string;
+  date: string; // ISO or YYYY-MM-DD
+  description: string;
+  location?: string;
+}
+
+export interface InstitutionalTrading {
+  foreignNet: number; // 外資超
+  investmentNet: number; // 投信超
+  dealerNet: number; // 自營商超
+  totalNet: number;
+  tradeDate: string;
+}
+
 export interface StockSentimentSummary {
   ticker: string;
   stockName: string;
@@ -60,6 +77,8 @@ export interface StockSentimentSummary {
   latestNews: StockNews[];
   signal: string;
   quote?: StockQuote;
+  institutional?: InstitutionalTrading;
+  upcomingEvent?: LegalConference;
 }
 
 export interface MarketOverview {
@@ -75,6 +94,7 @@ export interface DashboardData {
   stocks: StockSentimentSummary[];
   recentNews: StockNews[];
   xPosts: XPost[];
+  upcomingEvents: LegalConference[];
   lastAnalyzed: string;
 }
 

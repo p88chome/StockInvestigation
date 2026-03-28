@@ -188,6 +188,24 @@ export class StockService {
     return signals.sort((a, b) => b.dayTradeScore - a.dayTradeScore);
   }
 
+  calculateInstitutionalTrading(ticker: string): any {
+    // Deterministic mock data based on ticker and current date
+    const seed = ticker.split("").reduce((a, b) => a + b.charCodeAt(0), 0);
+    const day = new Date().getDate();
+    
+    const foreignNet = Math.round((Math.sin(seed + day) * 5000));
+    const investmentNet = Math.round((Math.cos(seed * day) * 2000));
+    const dealerNet = Math.round((Math.tan(seed + day/2) * 1000));
+    
+    return {
+      foreignNet,
+      investmentNet,
+      dealerNet,
+      totalNet: foreignNet + investmentNet + dealerNet,
+      tradeDate: new Date().toISOString().split("T")[0],
+    };
+  }
+
   computeSentimentSummaries(
     allNews: any[]
   ): any[] {
@@ -234,6 +252,7 @@ export class StockService {
         latestNews: news.slice(0, 3),
         signal,
         quote,
+        institutional: this.calculateInstitutionalTrading(stock.ticker),
       });
     }
 

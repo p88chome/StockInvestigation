@@ -9,6 +9,8 @@ import type {
   DayTradeData,
 } from "@shared/schema";
 
+import { eventService } from "./services/eventService";
+
 export async function registerRoutes(
   _httpServer: Server,
   app: Express
@@ -22,12 +24,14 @@ export async function registerRoutes(
     const allXPosts = await storage.getAllXPosts();
     const stocks = stockService.computeSentimentSummaries(allNews);
     const market = stockService.getDashboardMarket();
+    const upcomingEvents = eventService.getUpcomingEvents();
 
     const data: DashboardData = {
       market,
       stocks,
       recentNews: allNews.slice(0, 20),
       xPosts: allXPosts.slice(0, 15),
+      upcomingEvents,
       lastAnalyzed: aiService.getStatus().lastAnalyzed,
     };
 
