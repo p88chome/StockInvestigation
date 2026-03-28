@@ -12,13 +12,16 @@ function initFirebase(): App {
   const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (serviceAccountEnv) {
     try {
+      if (!serviceAccountEnv.trim().startsWith("{")) {
+        throw new Error("FIREBASE_SERVICE_ACCOUNT environment variable does not look like a JSON object.");
+      }
       const serviceAccount = JSON.parse(serviceAccountEnv);
       console.log("Firebase Admin initialized with provided service account from ENV.");
       return initializeApp({
         credential: cert(serviceAccount),
       });
     } catch (e) {
-      console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT", e);
+      console.error("CRITICAL: Failed to parse FIREBASE_SERVICE_ACCOUNT. Check your environment variables.", e);
     }
   }
 

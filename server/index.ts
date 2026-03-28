@@ -77,7 +77,11 @@ async function initializeApp() {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    return res.status(status).json({ 
+      message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined,
+      error_detail: err.toString() // Explicitly include the error string
+    });
   });
 
   if (process.env.NODE_ENV === "production") {
