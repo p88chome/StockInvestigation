@@ -2,14 +2,65 @@ import { TRACKED_STOCKS } from "@shared/constants";
 import type { InsertStockNews, InsertXPost } from "@shared/schema";
 import { storage } from "../storage";
 
+interface AzureConfig {
+  apiKey: string;
+  endpoint: string;
+  deployment: string;
+  apiVersion: string;
+}
+
+// Helper: get Azure OpenAI config from env or Firebase Functions runtime config
+function getAzureConfig(): AzureConfig | null {
+  const env = process.env;
+  
+  // Try ENV first
+  if (env.AZURE_OPENAI_API_KEY && env.AZURE_OPENAI_ENDPOINT && env.AZURE_OPENAI_DEPLOYMENT) {
+    return {
+      apiKey: env.AZURE_OPENAI_API_KEY,
+      endpoint: env.AZURE_OPENAI_ENDPOINT,
+      deployment: env.AZURE_OPENAI_DEPLOYMENT,
+      apiVersion: env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview",
+    };
+  }
+
+  // Try Firebase Functions config
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const firebaseConfig = require("firebase-functions").config();
+    if (firebaseConfig?.azure?.api_key) {
+      return {
+        apiKey: firebaseConfig.azure.api_key,
+        endpoint: firebaseConfig.azure.endpoint,
+        deployment: firebaseConfig.azure.deployment,
+        apiVersion: firebaseConfig.azure.api_version || "2024-12-01-preview",
+      };
+    }
+  } catch {
+    // not in Firebase environment or config not set
+  }
+
+  return null;
+}
+
 export class AiService {
   private isAnalyzing = false;
   private lastAnalyzed = "";
 
   async fetchXPosts(): Promise<void> {
     try {
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const client = new Anthropic();
+      const { OpenAI } = await import("openai");
+      const config = getAzureConfig();
+      if (!config) {
+        console.error("Azure OpenAI configuration is missing. Skipping X post fetch.");
+        return;
+      }
+
+      const client = new OpenAI({
+        apiKey: config.apiKey,
+        baseURL: `${config.endpoint}/openai/deployments/${config.deployment}`,
+        defaultQuery: { "api-version": config.apiVersion },
+        defaultHeaders: { "api-key": config.apiKey },
+      });
 
       const stockList = TRACKED_STOCKS.map((s) => `${s.ticker} ${s.name}`).join("、");
 
@@ -46,15 +97,19 @@ export class AiService {
 6. authorHandle 要看起來像真實帳號
 7. 請確保回傳有效的 JSON 陣列`;
 
-      const message = await client.messages.create({
-        model: "claude-haiku-4.5",
-        max_tokens: 4000,
+      const response = await client.chat.completions.create({
         messages: [{ role: "user", content: prompt }],
+        model: config.deployment,
+        max_tokens: 4000,
+        response_format: { type: "json_object" },
       });
 
-      const content = message.content[0].type === "text" ? message.content[0].text : "";
+      const content = response.choices[0].message.content || "";
       const jsonStr = this.extractJson(content);
-      const posts = JSON.parse(jsonStr) as InsertXPost[];
+      const parsed = JSON.parse(jsonStr);
+      // Handle either array or object wrapping an array
+      const posts = Array.isArray(parsed) ? parsed : (parsed.posts || Object.values(parsed)[0]) as InsertXPost[];
+      
       const now = new Date().toISOString();
 
       await storage.clearAllXPosts();
@@ -67,7 +122,7 @@ export class AiService {
       }));
 
       await storage.insertManyXPosts(postsToInsert);
-      console.log(`Fetched ${postsToInsert.length} X posts`);
+      console.log(`Fetched ${postsToInsert.length} X posts via Azure OpenAI`);
     } catch (error) {
       console.error("X post fetch error:", error);
     }
@@ -78,8 +133,20 @@ export class AiService {
     this.isAnalyzing = true;
 
     try {
-      const Anthropic = (await import("@anthropic-ai/sdk")).default;
-      const client = new Anthropic();
+      const { OpenAI } = await import("openai");
+      const config = getAzureConfig();
+      if (!config) {
+        console.error("Azure OpenAI configuration is missing. Skipping news analysis.");
+        this.isAnalyzing = false;
+        return;
+      }
+
+      const client = new OpenAI({
+        apiKey: config.apiKey,
+        baseURL: `${config.endpoint}/openai/deployments/${config.deployment}`,
+        defaultQuery: { "api-version": config.apiVersion },
+        defaultHeaders: { "api-key": config.apiKey },
+      });
 
       const prompt = `你是一位專業的全球資本市場分析師。請根據你所知道的最新市場動態，為以下台股、美股與加密貨幣主要標的提供新聞分析與情緒判斷。
 
@@ -109,15 +176,18 @@ ${TRACKED_STOCKS.map((s) => `- ${s.ticker} ${s.name} (市場: ${s.market})`).joi
 4. 確保回傳有效的 JSON 陣列
 5. 現在是2026年3月底，請考慮此時合理的世界觀態勢`;
 
-      const message = await client.messages.create({
-        model: "claude-haiku-4.5",
-        max_tokens: 6000,
+      const response = await client.chat.completions.create({
         messages: [{ role: "user", content: prompt }],
+        model: config.deployment,
+        max_tokens: 6000,
+        response_format: { type: "json_object" },
       });
 
-      const content = message.content[0].type === "text" ? message.content[0].text : "";
+      const content = response.choices[0].message.content || "";
       const jsonStr = this.extractJson(content);
-      const newsItems = JSON.parse(jsonStr) as InsertStockNews[];
+      const parsed = JSON.parse(jsonStr);
+      const newsItems = (Array.isArray(parsed) ? parsed : (parsed.news || Object.values(parsed)[0])) as InsertStockNews[];
+      
       const now = new Date().toISOString();
 
       await storage.clearAllNews();
@@ -130,7 +200,7 @@ ${TRACKED_STOCKS.map((s) => `- ${s.ticker} ${s.name} (市場: ${s.market})`).joi
 
       await storage.insertManyNews(newsToInsert);
       this.lastAnalyzed = now;
-      console.log(`Analyzed ${newsToInsert.length} news items`);
+      console.log(`Analyzed ${newsToInsert.length} news items via Azure OpenAI`);
     } catch (error) {
       console.error("Analysis error:", error);
     } finally {
@@ -141,7 +211,7 @@ ${TRACKED_STOCKS.map((s) => `- ${s.ticker} ${s.name} (市場: ${s.market})`).joi
   private extractJson(content: string): string {
     const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (codeBlockMatch) return codeBlockMatch[1].trim();
-    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    const jsonMatch = content.match(/\[[\s\S]*\]/) || content.match(/\{[\s\S]*\}/);
     return jsonMatch ? jsonMatch[0] : content;
   }
 

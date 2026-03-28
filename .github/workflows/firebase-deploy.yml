@@ -22,7 +22,7 @@ jobs:
       - name: Build Fullstack App (Client & Server)
         run: npm run build
         
-      - name: Deploy to Firebase
+      - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: '${{ secrets.GITHUB_TOKEN }}'
@@ -30,9 +30,24 @@ jobs:
           projectId: stockinvestigate-36eb4
           channelId: live
 
-      - name: Deploy Firebase Functions
+      - name: Deploy Firebase Functions (with env vars)
+        env:
+          AZURE_OPENAI_ENDPOINT: '${{ secrets.AZURE_OPENAI_ENDPOINT }}'
+          AZURE_OPENAI_API_KEY: '${{ secrets.AZURE_OPENAI_API_KEY }}'
+          AZURE_OPENAI_DEPLOYMENT: '${{ secrets.AZURE_OPENAI_DEPLOYMENT }}'
+          AZURE_OPENAI_API_VERSION: '${{ secrets.AZURE_OPENAI_API_VERSION }}'
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > sa.json
           export GOOGLE_APPLICATION_CREDENTIALS=$(pwd)/sa.json
+
+          # Set Azure OpenAI config as Firebase Function environment variables
+          npx firebase-tools functions:config:set \
+            azure.endpoint="${AZURE_OPENAI_ENDPOINT}" \
+            azure.api_key="${AZURE_OPENAI_API_KEY}" \
+            azure.deployment="${AZURE_OPENAI_DEPLOYMENT}" \
+            azure.api_version="${AZURE_OPENAI_API_VERSION}" \
+            --project stockinvestigate-36eb4
+
+          # Deploy functions
           npx firebase-tools deploy --only functions --project stockinvestigate-36eb4 -f
           rm sa.json
