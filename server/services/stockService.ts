@@ -513,9 +513,9 @@ export class StockService {
       // regularMarketPreviousClose = 昨日收盤（正確）
       // chartPreviousClose = 圖表起點的收盤（range=3mo 時是3個月前，不能用）
       const prev =
-        meta.regularMarketPreviousClose ||
+        bars[bars.length - 2]?.close ||          // 最可靠：直接用昨日收盤 bar
+        meta.regularMarketPreviousClose ||        // Yahoo 提供的前收（TW 股常為 null）
         meta.previousClose ||
-        bars[bars.length - 2]?.close ||   // 倒數第二根日線 fallback
         0;
       const change = Math.round((price - prev) * 100) / 100;
       const changePct = prev ? Math.round((change / prev) * 10000) / 100 : 0;

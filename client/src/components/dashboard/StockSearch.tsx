@@ -224,7 +224,9 @@ export function StockSearch() {
 
               {/* Footer */}
               <p className="text-[9px] text-muted-foreground mt-2">
-                成交值 {formatValue(q.value)} · 成交筆數 {q.transactions.toLocaleString()} 筆 · 資料來源：TWSE OpenAPI
+                {q.value > 0 && <>成交值 {formatValue(q.value)} · </>}
+                {q.transactions > 0 && <>成交筆數 {q.transactions.toLocaleString()} 筆 · </>}
+                資料來源：Yahoo Finance + TWSE
               </p>
             </Card>
           </motion.div>

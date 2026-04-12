@@ -149,18 +149,45 @@ async function loadInstitutional(): Promise<void> {
   }
 }
 
-// ─── Fetch Individual Stock Day Data ─────────────────────────────────────────
+// ─── Fetch price via Yahoo Finance (TWSE STOCK_DAY is unreliable) ────────────
 
-async function fetchStockDay(ticker: string): Promise<any[] | null> {
+interface YahooBar {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  timestamp: number; // unix seconds
+}
+
+async function fetchYahooTW(ticker: string): Promise<YahooBar[] | null> {
   try {
-    const res = await fetch(
-      `https://openapi.twse.com.tw/v1/exchangeReport/STOCK_DAY?stockNo=${encodeURIComponent(ticker)}`,
-      { headers: { "Accept": "application/json" } }
-    );
+    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}.TW?interval=1d&range=5d`;
+    const res = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)" },
+    });
     if (!res.ok) return null;
     const data = await res.json();
-    if (!Array.isArray(data) || data.length === 0) return null;
-    return data;
+    const result = data?.chart?.result?.[0];
+    if (!result) return null;
+
+    const timestamps: number[] = result.timestamp ?? [];
+    const q = result.indicators?.quote?.[0];
+    if (!q || timestamps.length === 0) return null;
+
+    const bars: YahooBar[] = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      if (q.close?.[i] == null || isNaN(q.close[i])) continue;
+      bars.push({
+        open: q.open?.[i] ?? q.close[i],
+        high: q.high?.[i] ?? q.close[i],
+        low: q.low?.[i] ?? q.close[i],
+        close: q.close[i],
+        volume: q.volume?.[i] ?? 0,
+        timestamp: timestamps[i],
+      });
+    }
+    return bars.length > 0 ? bars : null;
   } catch {
     return null;
   }
@@ -169,47 +196,52 @@ async function fetchStockDay(ticker: string): Promise<any[] | null> {
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
- * 查詢單一台股即時報價（最新交易日）
- * @param ticker 四位股票代碼，例如 "2330"
+ * 查詢單一台股即時報價
+ * 股價來源：Yahoo Finance {ticker}.TW（穩定）
+ * 基本面：TWSE BWIBBU_ALL（PE/PB/殖利率）
+ * @param ticker 股票代碼，例如 "2330"
  */
 export async function fetchTwseQuote(ticker: string): Promise<TwseStockQuote | null> {
-  const [dayData] = await Promise.all([
-    fetchStockDay(ticker),
+  const [bars] = await Promise.all([
+    fetchYahooTW(ticker),
     loadFundamentals(),
   ]);
-  if (!dayData) return null;
+  if (!bars || bars.length === 0) return null;
 
-  const last = dayData[dayData.length - 1];
-  const prev = dayData.length >= 2 ? dayData[dayData.length - 2] : null;
+  const last = bars[bars.length - 1];
+  // 前一交易日收盤（用 bars 倒數第二根，永遠正確）
+  const prevClose = bars.length >= 2 ? bars[bars.length - 2].close : 0;
 
-  const close = parseNum(last.ClosingPrice);
-  const prevClose = prev ? parseNum(prev.ClosingPrice) : 0;
-
-  // TWSE Change field: "+5.00" / "-3.00" / "--" (停牌)
-  const rawChange = String(last.Change ?? "").trim();
-  const change = rawChange && rawChange !== "--"
-    ? parseNum(rawChange)
-    : prevClose > 0 ? Math.round((close - prevClose) * 100) / 100 : 0;
-
+  const change = prevClose > 0
+    ? Math.round((last.close - prevClose) * 100) / 100
+    : 0;
   const changePercent = prevClose > 0
     ? Math.round((change / prevClose) * 10000) / 100
     : 0;
+
+  // 日期：Unix timestamp → YYYY/MM/DD
+  const date = last.timestamp
+    ? new Date(last.timestamp * 1000).toLocaleDateString("zh-TW", {
+        timeZone: "Asia/Taipei",
+        year: "numeric", month: "2-digit", day: "2-digit",
+      })
+    : "";
 
   const fund = fundamentalsCache.get(ticker);
 
   return {
     ticker,
     name: fund?.name ?? ticker,
-    date: rocToAd(last.Date ?? ""),
-    open: parseNum(last.OpeningPrice),
-    high: parseNum(last.HighestPrice),
-    low: parseNum(last.LowestPrice),
-    close,
+    date,
+    open: last.open,
+    high: last.high,
+    low: last.low,
+    close: last.close,
     change,
     changePercent,
-    volume: parseNum(last.TradeVolume),
-    value: parseNum(last.TradeValue),
-    transactions: parseNum(last.Transaction),
+    volume: last.volume,
+    value: 0,        // Yahoo Finance v8 不提供成交金額，設 0
+    transactions: 0,
     pe: fund?.pe ?? null,
     pb: fund?.pb ?? null,
     dividendYield: fund?.dividendYield ?? null,
