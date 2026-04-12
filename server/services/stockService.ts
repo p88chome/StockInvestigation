@@ -510,7 +510,13 @@ export class StockService {
       }
 
       const price = meta.regularMarketPrice || (bars[bars.length - 1]?.close ?? 0);
-      const prev = meta.chartPreviousClose || meta.previousClose || 0;
+      // regularMarketPreviousClose = 昨日收盤（正確）
+      // chartPreviousClose = 圖表起點的收盤（range=3mo 時是3個月前，不能用）
+      const prev =
+        meta.regularMarketPreviousClose ||
+        meta.previousClose ||
+        bars[bars.length - 2]?.close ||   // 倒數第二根日線 fallback
+        0;
       const change = Math.round((price - prev) * 100) / 100;
       const changePct = prev ? Math.round((change / prev) * 10000) / 100 : 0;
       const lastBar = bars[bars.length - 1];
