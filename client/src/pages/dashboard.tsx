@@ -30,7 +30,8 @@ import { XPostCard } from "@/components/dashboard/XPostCard";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MarketHeader, SentimentDistribution } from "@/components/dashboard/MarketHeader";
 import { StockSearch } from "@/components/dashboard/StockSearch";
-import { Calendar, Info } from "lucide-react";
+import { SideDrawer } from "@/components/SideDrawer";
+import { Info } from "lucide-react";
 
 /* ─── Motion presets ─── */
 const spring = { type: "spring" as const, damping: 30, stiffness: 200 };
@@ -175,29 +176,7 @@ export default function Dashboard() {
           </Card>
         </motion.div>
 
-        {data?.upcomingEvents && data.upcomingEvents.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.1 }} className="mb-5 overflow-x-auto pb-2 scrollbar-hide">
-            <div className="flex items-center gap-2 mb-2 px-1">
-              <Calendar className="w-3.5 h-3.5 text-primary" />
-              <h2 className="text-xs font-bold">即將法說會 (Event Calendar)</h2>
-            </div>
-            <div className="flex gap-3">
-              {data.upcomingEvents.map((event, i) => (
-                <div key={i} className="flex-shrink-0 w-48 p-2.5 rounded-xl bg-card border border-border/60 hover:border-primary/30 transition-colors shadow-sm relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 p-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  </div>
-                  <div className="flex justify-between items-start mb-1.5">
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-primary/10 text-primary">{event.ticker}</span>
-                    <span className="text-[10px] text-muted-foreground font-medium">{event.date}</span>
-                  </div>
-                  <p className="text-[11px] font-semibold mb-1 truncate">{event.stockName}</p>
-                  <p className="text-[10px] text-muted-foreground leading-snug line-clamp-2">{event.description}</p>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
+        {/* 法說行事曆已移至右下角 AI 問答 Drawer */}
 
         {/* ─── TWSE 個股查詢 ─── */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.12 }}>
@@ -281,6 +260,9 @@ export default function Dashboard() {
           <PerplexityAttribution />
         </motion.footer>
       </div>
+
+      {/* AI 問答 + 法說行事曆 Drawer */}
+      <SideDrawer events={data?.upcomingEvents ?? []} />
     </div>
   );
 }

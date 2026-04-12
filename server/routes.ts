@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { aiService } from "./services/aiService";
 import { stockService } from "./services/stockService";
 import { fetchTwseQuote, fetchTwseInstitutional, preloadTwseData } from "./services/twseService";
+import { chat } from "./services/chatService";
 import type {
   DashboardData,
   MarketOverview,
@@ -113,6 +114,25 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Daytrade API Error:", error);
       res.status(500).json({ message: "無法載入當沖數據" });
+    }
+  });
+
+  // ─── AI Chat ───
+  app.post("/api/chat", async (req, res) => {
+    try {
+      const { message, history = [] } = req.body;
+      if (!message || typeof message !== "string" || message.trim().length === 0) {
+        return res.status(400).json({ message: "請輸入問題內容" });
+      }
+      if (message.length > 500) {
+        return res.status(400).json({ message: "問題過長，請精簡後再試（最多 500 字）" });
+      }
+
+      const reply = await chat({ message: message.trim(), history });
+      res.json({ reply });
+    } catch (err) {
+      console.error("[Chat API] Error:", err);
+      res.status(500).json({ message: "AI 服務暫時無法使用" });
     }
   });
 
