@@ -110,7 +110,17 @@ if (!isFirebase) {
 }
 
 // Export as Firebase Cloud Function
-export const api = onRequest({ region: "asia-east1" }, async (req, res) => {
+export const api = onRequest({ 
+  region: "asia-east1",
+  secrets: [
+    "OPENAI_API_KEY",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT",
+    "AZURE_OPENAI_API_VERSION",
+    "FINMIND_TOKEN"
+  ]
+}, async (req, res) => {
   await initializeApp();
   return app(req, res);
 });
