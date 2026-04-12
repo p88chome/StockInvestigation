@@ -29,6 +29,7 @@ import { NewsItem } from "@/components/dashboard/NewsItem";
 import { XPostCard } from "@/components/dashboard/XPostCard";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MarketHeader, SentimentDistribution } from "@/components/dashboard/MarketHeader";
+import { StockSearch } from "@/components/dashboard/StockSearch";
 import { Calendar, Info } from "lucide-react";
 
 /* ─── Motion presets ─── */
@@ -197,6 +198,11 @@ export default function Dashboard() {
             </div>
           </motion.div>
         )}
+
+        {/* ─── TWSE 個股查詢 ─── */}
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.12 }}>
+          <StockSearch />
+        </motion.div>
 
         <motion.div className="grid grid-cols-3 gap-3 mb-5" variants={stagger} initial="hidden" animate="show">
           <KpiCard value={bullishCount} label="看漲" color="text-emerald-500" icon={TrendingUp} testId="kpi-bullish" />

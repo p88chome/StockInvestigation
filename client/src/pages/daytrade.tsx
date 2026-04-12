@@ -12,11 +12,12 @@ import {
   Activity,
   BarChart3,
   ShieldCheck,
+  Gauge,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { useState } from "react";
-import type { DayTradeData } from "@shared/schema";
+import type { DayTradeData, MarketBreadth } from "@shared/schema";
 
 // Extracted Components
 import { SignalCard } from "@/components/daytrade/SignalCard";
@@ -26,6 +27,88 @@ import { EducationSection } from "@/components/daytrade/EducationSection";
 const spring = { type: "spring" as const, damping: 30, stiffness: 200 };
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
 const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: spring } };
+
+// ─── Market Breadth Panel ─────────────────────────────────────────────────────
+function MarketBreadthPanel({ breadth }: { breadth: MarketBreadth }) {
+  const signalMap = {
+    bullish: { label: "大盤偏多", cls: "text-emerald-500", barCls: "bg-emerald-500" },
+    bearish: { label: "大盤偏空", cls: "text-red-500", barCls: "bg-red-500" },
+    neutral: { label: "大盤中性", cls: "text-muted-foreground", barCls: "bg-gray-400" },
+  };
+  const { label, cls, barCls } = signalMap[breadth.breadthSignal];
+  const total = breadth.advanceCount + breadth.declineCount + breadth.neutralCount || 1;
+  const advPct = Math.round((breadth.advanceCount / total) * 100);
+  const decPct = Math.round((breadth.declineCount / total) * 100);
+
+  const maAlignMap = {
+    bullish: { label: "多頭排列", cls: "text-emerald-500" },
+    bearish: { label: "空頭排列", cls: "text-red-500" },
+    mixed: { label: "混排", cls: "text-muted-foreground" },
+  };
+  const maInfo = maAlignMap[breadth.taiexMaAlignment];
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.08 }}>
+      <div className="rounded-xl border border-border/60 p-4 bg-card/80 backdrop-blur-sm mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Gauge className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-bold">大盤技術狀態 (TAIEX)</h2>
+          </div>
+          <span className={`text-xs font-bold ${cls}`}>{label}</span>
+        </div>
+
+        {/* Advance / Decline bar */}
+        <div className="mb-3">
+          <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+            <span className="text-emerald-500 font-semibold">↑ {breadth.advanceCount} 漲 ({advPct}%)</span>
+            <span className="text-muted-foreground">{breadth.neutralCount} 平</span>
+            <span className="text-red-500 font-semibold">{breadth.declineCount} 跌 ({decPct}%) ↓</span>
+          </div>
+          <div className="h-2 rounded-full bg-muted/40 overflow-hidden flex">
+            <div className="bg-emerald-500/70 h-full rounded-l-full transition-all" style={{ width: `${advPct}%` }} />
+            <div className="bg-red-500/70 h-full rounded-r-full transition-all ml-auto" style={{ width: `${decPct}%` }} />
+          </div>
+        </div>
+
+        {/* TAIEX Technicals */}
+        <div className="grid grid-cols-4 gap-2">
+          <div className="flex flex-col">
+            <span className="text-[9px] text-muted-foreground">TAIEX MA20</span>
+            <span className="text-[11px] font-bold tabular-nums">
+              {breadth.taiexMa20 != null ? breadth.taiexMa20.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "--"}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-muted-foreground">TAIEX MA60</span>
+            <span className="text-[11px] font-bold tabular-nums">
+              {breadth.taiexMa60 != null ? breadth.taiexMa60.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "--"}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-muted-foreground">TAIEX RSI</span>
+            <span className={`text-[11px] font-bold tabular-nums ${breadth.taiexRsi && breadth.taiexRsi > 70 ? "text-orange-400" : breadth.taiexRsi && breadth.taiexRsi < 30 ? "text-sky-400" : ""}`}>
+              {breadth.taiexRsi != null ? breadth.taiexRsi.toFixed(1) : "--"}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[9px] text-muted-foreground">均線排列</span>
+            <span className={`text-[11px] font-bold ${maInfo.cls}`}>{maInfo.label}</span>
+          </div>
+        </div>
+
+        {breadth.taiexMacdHistogram !== null && (
+          <div className="mt-2 flex items-center gap-2 text-[10px]">
+            <span className="text-muted-foreground">MACD 柱狀</span>
+            <span className={`font-bold tabular-nums ${breadth.taiexMacdHistogram > 0 ? "text-emerald-500" : "text-red-500"}`}>
+              {breadth.taiexMacdHistogram > 0 ? "+" : ""}{breadth.taiexMacdHistogram.toFixed(2)} ({breadth.taiexMacdHistogram > 0 ? "多方動能" : "空方持續"})
+            </span>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+}
 
 function LoadingSkeleton() {
   return (
@@ -100,6 +183,9 @@ export default function DayTrade() {
             </Button>
           </div>
         </motion.header>
+
+        {/* 大盤技術狀態 */}
+        {data?.breadth && <MarketBreadthPanel breadth={data.breadth} />}
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-7 space-y-6">

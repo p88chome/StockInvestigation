@@ -3,6 +3,7 @@ import { type Server } from "http";
 import { storage } from "./storage";
 import { aiService } from "./services/aiService";
 import { stockService } from "./services/stockService";
+import { fetchTwseQuote, fetchTwseInstitutional, preloadTwseData } from "./services/twseService";
 import type {
   DashboardData,
   MarketOverview,
@@ -99,9 +100,12 @@ export async function registerRoutes(
       const signals = stockService.calculateDayTradeSignals();
       const market = stockService.getDashboardMarket();
 
+      const breadth = stockService.calculateMarketBreadth();
+
       const data: DayTradeData = {
         signals,
         market,
+        breadth,
         lastUpdated: new Date().toISOString(),
       };
 
@@ -109,6 +113,35 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Daytrade API Error:", error);
       res.status(500).json({ message: "無法載入當沖數據" });
+    }
+  });
+
+  // ─── TWSE Stock Lookup ───
+  /**
+   * GET /api/twse/:ticker
+   * 以 TWSE OpenAPI 查詢任意台股即時報價 + 基本面 + 法人買賣超
+   * e.g. GET /api/twse/2330
+   */
+  app.get("/api/twse/:ticker", async (req, res) => {
+    const { ticker } = req.params;
+    if (!/^\d{4,6}$/.test(ticker)) {
+      return res.status(400).json({ message: "請輸入有效的台股代碼（4-6 位數字）" });
+    }
+
+    try {
+      const [quote, institutional] = await Promise.all([
+        fetchTwseQuote(ticker),
+        fetchTwseInstitutional(ticker),
+      ]);
+
+      if (!quote) {
+        return res.status(404).json({ message: `找不到股票代碼 ${ticker} 的資料，請確認代碼正確且該股票有在上市交易` });
+      }
+
+      res.json({ quote, institutional });
+    } catch (err) {
+      console.error(`[TWSE] Lookup error for ${ticker}:`, err);
+      res.status(500).json({ message: "查詢失敗，請稍後再試" });
     }
   });
 
@@ -125,6 +158,9 @@ export async function registerRoutes(
 
   // Try initial quote fetch (non-blocking)
   stockService.fetchRealTimeQuotes().catch(err => console.error("Initial Quote Fetch Error in registerRoutes", err));
+
+  // Preload TWSE fundamentals + institutional data (non-blocking)
+  preloadTwseData().catch(err => console.error("TWSE Preload Error:", err));
 
   return _httpServer;
 }
