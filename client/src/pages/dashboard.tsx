@@ -31,28 +31,51 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import { MarketHeader, SentimentDistribution } from "@/components/dashboard/MarketHeader";
 import { StockSearch } from "@/components/dashboard/StockSearch";
 import { SideDrawer } from "@/components/SideDrawer";
-import { Info } from "lucide-react";
 
 /* ─── Motion presets ─── */
 const spring = { type: "spring" as const, damping: 30, stiffness: 200 };
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
-const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: spring } };
 const fadeIn = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { duration: 0.35 } } };
 
 /* ─── Loading Skeleton ─── */
 function LoadingSkeleton() {
   return (
-    <div className="space-y-4 p-6">
-      <div className="flex gap-4 items-center"><Skeleton className="h-8 w-32" /><Skeleton className="h-6 w-24" /></div>
-      <div className="grid grid-cols-3 gap-3">{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}</div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-lg" />)}</div>
+    <div className="space-y-4 p-6 pt-24">
+      <div className="flex gap-4 items-center">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-6 w-24" />
+      </div>
+      <div className="grid grid-cols-3 gap-3">
+        {Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-24 rounded-xl" />)}
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-32 rounded-xl" />)}
+      </div>
     </div>
+  );
+}
+
+/* ─── Market Tab Button ─── */
+function MarketTabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative px-5 py-1.5 text-sm font-medium rounded-full transition-all duration-200 cursor-pointer
+        ${active
+          ? "bg-primary text-primary-foreground shadow-[0_0_14px_hsl(var(--primary)/0.35)]"
+          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+        }`}
+    >
+      {children}
+    </button>
   );
 }
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const [isDark, setIsDark] = useState(typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const [isDark, setIsDark] = useState(
+    typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches
+  );
   const [activeTab, setActiveTab] = useState<"news" | "x">("x");
   const [marketTab, setMarketTab] = useState<"tw" | "us" | "crypto">("tw");
 
@@ -84,15 +107,26 @@ export default function Dashboard() {
   const neutralCount = filteredStocks.filter((s) => s.overallSentiment === "neutral").length || 0;
   const totalNews = data?.recentNews.length || 0;
   const totalXPosts = data?.xPosts?.length || 0;
+  const isMarketOpen = data?.market.marketStatus === "open";
 
   if (isLoading && !data) {
     return (
       <div className="min-h-screen bg-background">
+        {/* Sticky header skeleton */}
+        <div className="fixed top-4 left-4 right-4 z-50 h-14 glass-card rounded-2xl" />
         <div className="max-w-6xl mx-auto">
-          <motion.div className="p-6 flex items-center gap-3" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+          <motion.div
+            className="p-6 pt-24 flex items-center gap-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
             <div className="relative">
               <Activity className="w-5 h-5 text-primary" />
-              <motion.div className="absolute inset-0 rounded-full bg-primary/20" animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
+              <motion.div
+                className="absolute inset-0 rounded-full bg-primary/20"
+                animate={{ scale: [1, 1.8, 1], opacity: [0.5, 0, 0.5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
             </div>
             <span className="text-sm text-muted-foreground">AI 正在分析市場新聞與 X 即時輿情...首次載入需要約 30 秒</span>
           </motion.div>
@@ -104,159 +138,278 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Ambient background orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/4 w-[800px] h-[800px] rounded-full bg-primary/[0.02] blur-3xl" />
-        <div className="absolute -bottom-1/2 -left-1/4 w-[600px] h-[600px] rounded-full bg-primary/[0.015] blur-3xl" />
+        <div className="absolute -top-1/2 -right-1/4 w-[900px] h-[900px] rounded-full bg-primary/[0.025] blur-[120px]" />
+        <div className="absolute -bottom-1/2 -left-1/4 w-[700px] h-[700px] rounded-full bg-emerald-500/[0.015] blur-[100px]" />
       </div>
 
-      <div className="relative max-w-6xl mx-auto px-4 py-5">
-        <motion.header className="flex items-center justify-between mb-6" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={spring}>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <svg viewBox="0 0 32 32" className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2" aria-label="台股情報站">
-                <rect x="2" y="18" width="6" height="12" rx="1" /><rect x="13" y="10" width="6" height="20" rx="1" /><rect x="24" y="2" width="6" height="28" rx="1" />
-                <path d="M5 16 L16 8 L27 2" strokeLinecap="round" />
-              </svg>
-              <div className="absolute -inset-1 bg-primary/10 rounded-lg blur-sm -z-10" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold tracking-tight">台股情報站</h1>
-              <p className="text-xs text-muted-foreground">AI 新聞情緒分析 · X 即時輿情 · 真實股價</p>
-            </div>
+      {/* ─── Floating Glassmorphism Navbar ─── */}
+      <motion.nav
+        className="fixed top-4 left-4 right-4 z-50 glass-card rounded-2xl px-4 py-2.5 flex items-center justify-between shadow-lg"
+        initial={{ opacity: 0, y: -16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={spring}
+      >
+        {/* Logo + title */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-shrink-0">
+            <svg viewBox="0 0 32 32" className="w-7 h-7 text-primary" fill="none" stroke="currentColor" strokeWidth="2" aria-label="台股情報站">
+              <rect x="2" y="18" width="6" height="12" rx="1" />
+              <rect x="13" y="10" width="6" height="20" rx="1" />
+              <rect x="24" y="2" width="6" height="28" rx="1" />
+              <path d="M5 16 L16 8 L27 2" strokeLinecap="round" />
+            </svg>
+            <div className="absolute -inset-1 bg-primary/15 rounded-lg blur-sm -z-10" />
           </div>
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={() => setIsDark(!isDark)} data-testid="button-theme-toggle" className="backdrop-blur-sm">
-                  <AnimatePresence mode="wait">
-                    <motion.div key={isDark ? "sun" : "moon"} initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.2 }}>
-                      {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-                    </motion.div>
-                  </AnimatePresence>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>切換明暗模式</TooltipContent>
-            </Tooltip>
-            <Link href="/daytrade">
-              <Button variant="outline" size="sm" className="gap-1.5 backdrop-blur-sm" data-testid="button-daytrade">
-                <Zap className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">當沖工具</span>
-              </Button>
-            </Link>
-            <Button variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} disabled={analyzeMutation.isPending} data-testid="button-refresh-analysis" className="gap-1.5 backdrop-blur-sm">
-              <RefreshCw className={`w-3.5 h-3.5 ${analyzeMutation.isPending || isRefetching ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">重新分析</span>
-            </Button>
+          <div>
+            <h1 className="text-sm font-bold tracking-tight leading-none">台股情報站</h1>
+            <p className="text-[10px] text-muted-foreground mt-0.5 leading-none">AI 情緒分析 · X 輿情 · 即時股價</p>
           </div>
-        </motion.header>
+          {/* Live indicator */}
+          {isMarketOpen && (
+            <div className="hidden sm:flex items-center gap-1.5 ml-1 text-[10px] font-semibold text-emerald-500">
+              <span className="live-dot scale-75" />
+              LIVE
+            </div>
+          )}
+        </div>
 
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.05 }}>
-          <Card className="relative overflow-hidden p-4 mb-5 border-border/50" data-testid="card-market-overview">
-            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-primary to-red-500 opacity-60" />
+        {/* Nav actions */}
+        <div className="flex items-center gap-1.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsDark(!isDark)}
+                data-testid="button-theme-toggle"
+                className="w-8 h-8 rounded-xl cursor-pointer"
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={isDark ? "sun" : "moon"}
+                    initial={{ rotate: -90, opacity: 0 }}
+                    animate={{ rotate: 0, opacity: 1 }}
+                    exit={{ rotate: 90, opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                  </motion.div>
+                </AnimatePresence>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>切換明暗模式</TooltipContent>
+          </Tooltip>
+
+          <Link href="/daytrade">
+            <Button variant="outline" size="sm" className="gap-1.5 rounded-xl h-8 cursor-pointer" data-testid="button-daytrade">
+              <Zap className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-xs">當沖工具</span>
+            </Button>
+          </Link>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => analyzeMutation.mutate()}
+            disabled={analyzeMutation.isPending}
+            data-testid="button-refresh-analysis"
+            className="gap-1.5 rounded-xl h-8 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${analyzeMutation.isPending || isRefetching ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline text-xs">重新分析</span>
+          </Button>
+        </div>
+      </motion.nav>
+
+      {/* ─── Page content (offset for fixed nav) ─── */}
+      <div className="relative max-w-6xl mx-auto px-4 pt-24 pb-6">
+
+        {/* ─── Market Overview Card ─── */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...spring, delay: 0.05 }}
+          className="mb-5"
+        >
+          <div className="relative overflow-hidden glass-card rounded-2xl p-5" data-testid="card-market-overview">
+            {/* Gradient top stripe */}
+            <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-emerald-500 via-primary to-red-500 opacity-70 rounded-t-2xl" />
+
             <div className="flex items-center justify-between flex-wrap gap-4">
               <MarketHeader data={data} />
-              <div className="flex items-center gap-4">
+
+              <div className="flex items-center gap-5">
                 {data && data.stocks.length > 0 && (
-                  <div className="hidden sm:block w-40">
-                    <SentimentDistribution bullish={bullishCount} neutral={neutralCount} bearish={bearishCount} />
-                    <div className="flex justify-between mt-1">
-                      <span className="text-[9px] text-emerald-500 tabular-nums">{bullishCount} 漲</span>
-                      <span className="text-[9px] text-muted-foreground tabular-nums">{neutralCount} 平</span>
-                      <span className="text-[9px] text-red-500 tabular-nums">{bearishCount} 跌</span>
+                  <div className="hidden sm:block w-44">
+                    <div className="flex justify-between mb-1.5">
+                      <span className="text-[10px] text-emerald-500 font-semibold tabular-nums">{bullishCount} 漲</span>
+                      <span className="text-[10px] text-muted-foreground tabular-nums">{neutralCount} 平</span>
+                      <span className="text-[10px] text-red-500 font-semibold tabular-nums">{bearishCount} 跌</span>
                     </div>
+                    <SentimentDistribution bullish={bullishCount} neutral={neutralCount} bearish={bearishCount} />
                   </div>
                 )}
                 {data?.lastAnalyzed && (
-                  <div className="text-[10px] text-muted-foreground flex items-center gap-1">
-                    <Zap className="w-3 h-3" />{new Date(data.lastAnalyzed).toLocaleString("zh-TW")}
+                  <div className="text-[10px] text-muted-foreground flex items-center gap-1 border border-border/40 rounded-lg px-2 py-1">
+                    <Activity className="w-3 h-3 text-primary" />
+                    {new Date(data.lastAnalyzed).toLocaleString("zh-TW")}
                   </div>
                 )}
               </div>
             </div>
-          </Card>
+          </div>
         </motion.div>
 
-        {/* 法說行事曆已移至右下角 AI 問答 Drawer */}
-
-        {/* ─── TWSE 個股查詢 ─── */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.12 }}>
+        {/* ─── Stock Search ─── */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ ...spring, delay: 0.10 }}
+        >
           <StockSearch />
         </motion.div>
 
+        {/* ─── KPI Cards ─── */}
         <motion.div className="grid grid-cols-3 gap-3 mb-5" variants={stagger} initial="hidden" animate="show">
           <KpiCard value={bullishCount} label="看漲" color="text-emerald-500" icon={TrendingUp} testId="kpi-bullish" />
           <KpiCard value={neutralCount} label="中性" color="text-gray-400" icon={Minus} testId="kpi-neutral" />
           <KpiCard value={bearishCount} label="看跌" color="text-red-500" icon={TrendingDown} testId="kpi-bearish" />
         </motion.div>
 
+        {/* ─── Empty state ─── */}
         {(!data || data.stocks.length === 0) && !isLoading && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-            <Card className="p-8 text-center">
-              <div className="relative inline-block mb-3">
-                <Activity className="w-8 h-8 text-primary" />
-                <motion.div className="absolute inset-0 rounded-full bg-primary/20" animate={{ scale: [1, 2, 1], opacity: [0.4, 0, 0.4] }} transition={{ duration: 2, repeat: Infinity }} />
+            <Card className="p-10 text-center rounded-2xl border-dashed border-2">
+              <div className="relative inline-block mb-4">
+                <Activity className="w-9 h-9 text-primary" />
+                <motion.div
+                  className="absolute inset-0 rounded-full bg-primary/20"
+                  animate={{ scale: [1, 2, 1], opacity: [0.4, 0, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                />
               </div>
-              <p className="text-sm text-muted-foreground mb-3">AI 正在分析最新市場新聞與 X 輿情，請稍候...</p>
-              <Button disabled={analyzeMutation.isPending} variant="outline" size="sm" onClick={() => analyzeMutation.mutate()} data-testid="button-start-analysis">
-                <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${analyzeMutation.isPending ? "animate-spin" : ""}`} />啟動分析
+              <p className="text-sm text-muted-foreground mb-4">AI 正在分析最新市場新聞與 X 輿情，請稍候...</p>
+              <Button
+                disabled={analyzeMutation.isPending}
+                variant="outline"
+                size="sm"
+                onClick={() => analyzeMutation.mutate()}
+                data-testid="button-start-analysis"
+                className="rounded-xl gap-1.5 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${analyzeMutation.isPending ? "animate-spin" : ""}`} />
+                啟動分析
               </Button>
             </Card>
           </motion.div>
         )}
 
+        {/* ─── Stock Sentiment Section ─── */}
         {data && data.stocks.length > 0 && (
           <>
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-hide">
-              <Button variant={marketTab === "tw" ? "default" : "outline"} size="sm" onClick={() => setMarketTab("tw")} className="rounded-full px-5">台股</Button>
-              <Button variant={marketTab === "us" ? "default" : "outline"} size="sm" onClick={() => setMarketTab("us")} className="rounded-full px-5">美股</Button>
-              <Button variant={marketTab === "crypto" ? "default" : "outline"} size="sm" onClick={() => setMarketTab("crypto")} className="rounded-full px-5">加密貨幣</Button>
+            {/* Market tab pills */}
+            <div className="flex gap-2 mb-5 overflow-x-auto pb-1 scrollbar-hide">
+              <MarketTabBtn active={marketTab === "tw"} onClick={() => setMarketTab("tw")}>台股</MarketTabBtn>
+              <MarketTabBtn active={marketTab === "us"} onClick={() => setMarketTab("us")}>美股</MarketTabBtn>
+              <MarketTabBtn active={marketTab === "crypto"} onClick={() => setMarketTab("crypto")}>加密貨幣</MarketTabBtn>
             </div>
 
+            {/* Section heading */}
             <motion.div className="flex items-center gap-2 mb-3" variants={fadeIn} initial="hidden" animate="show">
               <BarChart3 className="w-4 h-4 text-primary" />
               <h2 className="text-sm font-semibold">個股情緒分析</h2>
               <span className="text-xs text-muted-foreground">(點擊展開詳情)</span>
-              <span className="ml-auto text-[10px] text-muted-foreground tabular-nums px-1.5 py-0 border rounded">{totalNews} 則新聞</span>
+              <span className="ml-auto text-[10px] text-muted-foreground tabular-nums border border-border/50 rounded-md px-1.5 py-0.5">
+                {totalNews} 則新聞
+              </span>
             </motion.div>
 
-            <motion.div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6" variants={stagger} initial="hidden" animate="show">
+            {/* Stock cards */}
+            <motion.div
+              className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-7"
+              variants={stagger}
+              initial="hidden"
+              animate="show"
+            >
               {filteredStocks.map((stock, i) => <StockCard key={stock.ticker} stock={stock} index={i} />)}
             </motion.div>
 
-            <div className="flex items-center gap-1 mb-3 border-b border-border/50 pb-2">
-              <button onClick={() => setActiveTab("x")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeTab === "x" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}>
-                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            {/* ─── Feed tabs ─── */}
+            <div className="flex items-center gap-1 mb-4 border-b border-border/50 pb-0">
+              <button
+                onClick={() => setActiveTab("x")}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all duration-200 border-b-2 -mb-px cursor-pointer
+                  ${activeTab === "x"
+                    ? "text-primary border-primary"
+                    : "text-muted-foreground border-transparent hover:text-foreground"
+                  }`}
+              >
+                <svg viewBox="0 0 24 24" className="w-3.5 h-3.5" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
                 即時輿情
-                {totalXPosts > 0 && <span className="ml-1 text-[10px] px-1.5 py-0 border rounded">{totalXPosts}</span>}
+                {totalXPosts > 0 && (
+                  <span className="ml-1 text-[10px] px-1.5 py-0 border border-current/30 rounded-md tabular-nums">{totalXPosts}</span>
+                )}
               </button>
-              <button onClick={() => setActiveTab("news")} className={`flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${activeTab === "news" ? "text-primary border-b-2 border-primary" : "text-muted-foreground hover:text-foreground"}`}>
+              <button
+                onClick={() => setActiveTab("news")}
+                className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium transition-all duration-200 border-b-2 -mb-px cursor-pointer
+                  ${activeTab === "news"
+                    ? "text-primary border-primary"
+                    : "text-muted-foreground border-transparent hover:text-foreground"
+                  }`}
+              >
                 <Newspaper className="w-3.5 h-3.5" />
                 市場新聞
-                <span className="ml-1 text-[10px] px-1.5 py-0 border rounded">{totalNews}</span>
+                <span className="ml-1 text-[10px] px-1.5 py-0 border border-current/30 rounded-md tabular-nums">{totalNews}</span>
               </button>
             </div>
 
+            {/* ─── Feed content ─── */}
             <AnimatePresence mode="wait">
               {activeTab === "x" && (
-                <motion.div key="x" className="space-y-2 mb-8" variants={stagger} initial="hidden" animate="show" exit={{ opacity: 0 }}>
+                <motion.div
+                  key="x"
+                  className="space-y-2 mb-8"
+                  variants={stagger}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                >
                   {(data.xPosts || []).length === 0 ? (
-                    <div className="text-center py-6 text-sm text-muted-foreground">X 輿情分析中...</div>
+                    <div className="text-center py-10 text-sm text-muted-foreground">X 輿情分析中...</div>
                   ) : (
-                    (data.xPosts || []).map((post, i) => <XPostCard key={post.id} post={post} />)
+                    (data.xPosts || []).map((post) => <XPostCard key={post.id} post={post} />)
                   )}
                 </motion.div>
               )}
               {activeTab === "news" && (
-                <motion.div key="news" className="space-y-2 mb-8" variants={stagger} initial="hidden" animate="show" exit={{ opacity: 0 }}>
-                  {data.recentNews.slice(0, 15).map((news, i) => <NewsItem key={news.id} news={news} />)}
+                <motion.div
+                  key="news"
+                  className="space-y-2 mb-8"
+                  variants={stagger}
+                  initial="hidden"
+                  animate="show"
+                  exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
+                >
+                  {data.recentNews.slice(0, 15).map((news) => <NewsItem key={news.id} news={news} />)}
                 </motion.div>
               )}
             </AnimatePresence>
           </>
         )}
 
-        <motion.footer className="py-4 border-t border-border/50 text-center" variants={fadeIn} initial="hidden" animate="show">
-          <p className="text-[10px] text-muted-foreground mb-1">本站資訊僅供參考，不構成投資建議。投資有風險，請自行判斷。</p>
+        {/* ─── Footer ─── */}
+        <motion.footer
+          className="py-5 border-t border-border/40 text-center"
+          variants={fadeIn}
+          initial="hidden"
+          animate="show"
+        >
+          <p className="text-[10px] text-muted-foreground mb-1.5">本站資訊僅供參考，不構成投資建議。投資有風險，請自行判斷。</p>
           <PerplexityAttribution />
         </motion.footer>
       </div>
